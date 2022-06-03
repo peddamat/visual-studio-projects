@@ -87,30 +87,30 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM 
 }
 
 // Reference: https://microsoft.public.vc.language.narkive.com/6oyFmtSV/wm-getminmaxinfo-setwindowshookex
-//extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARAM wParam, LPARAM lParam) {
-//
-//	// Only handle messages from other processes
-//	if (code >= 0)
-//	{
-//		auto data = reinterpret_cast<CWPRETSTRUCT*>(lParam);
-//		switch (data->message)
-//		{
-//		case WM_GETMINMAXINFO:
-//			//auto minmax = reinterpret_cast<MINMAXINFO *>(data->lParam);
-////            minmax->ptMinTrackSize.x = 300;
-////            minmax->ptMaxTrackSize.x = 300;
-//			LPPOINT lppt = (LPPOINT)data->lParam;
-//			lppt[3].x = 100; // Set minimum width to current width
-//			lppt[4].x = 100;
-//
-//
-//			break;
-//		}
-//	}
-//
-//
-//	return(CallNextHookEx(NULL, code, wParam, lParam));
-//}
+extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARAM wParam, LPARAM lParam) {
+
+	// Only handle messages from other processes
+	if (code >= 0)
+	{
+		auto data = reinterpret_cast<CWPRETSTRUCT*>(lParam);
+		switch (data->message)
+		{
+		case WM_GETMINMAXINFO:
+			//auto minmax = reinterpret_cast<MINMAXINFO *>(data->lParam);
+//            minmax->ptMinTrackSize.x = 300;
+//            minmax->ptMaxTrackSize.x = 300;
+			LPPOINT lppt = (LPPOINT)data->lParam;
+			lppt[3].x = 100; // Set minimum width to current width
+			lppt[4].x = 100;
+
+
+			break;
+		}
+	}
+
+
+	return(CallNextHookEx(NULL, code, wParam, lParam));
+}
 
 LRESULT CALLBACK NewWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
