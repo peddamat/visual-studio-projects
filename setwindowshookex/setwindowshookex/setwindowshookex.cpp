@@ -13,8 +13,10 @@ int printError(char* msg)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	LONG oldWndProc;
 	HHOOK handle = NULL;
+	HOOKPROC procAddr = NULL;
+	HOOKPROC procAddr2 = NULL;
+	HOOKPROC procAddr3 = NULL;
 
 	// Load library in which we'll be hooking our functions.
 	HMODULE dll = LoadLibrary(L"dllinject.dll");
@@ -26,18 +28,27 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
-	// Get the address of the function inside the DLL.
-	HOOKPROC keyboardProcAddr = (HOOKPROC)GetProcAddress(dll, "keyboardProc");
-	if (keyboardProcAddr == NULL) { return printError("keyboardProc not found.\n"); }
+	// Hook #1
+	//procAddr = (HOOKPROC)GetProcAddress(dll, "keyboardProc");
+	//if (procAddr== NULL) { return printError("keyboardProc not found.\n"); }
 
-	HOOKPROC callWndProcAddr = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
-	if (callWndProcAddr == NULL) { return printError("callWndProcRet not found.\n"); }
+	//handle = SetWindowsHookEx(WH_KEYBOARD, procAddr, dll, threadID);
+	//if (handle == NULL) { printf("WH_KEYBOARD could not be hooked.\n"); }
 
-	// Hook the function.
-	handle = SetWindowsHookEx(WH_KEYBOARD, keyboardProcAddr, dll, threadID);
-	if (handle == NULL) { printf("WH_KEYBOARD could not be hooked.\n"); }
 
-	handle = SetWindowsHookEx(WH_CALLWNDPROCRET, callWndProcAddr, dll, threadID);
+	// Hook #2
+	procAddr2 = (HOOKPROC)GetProcAddress(dll, "callWndProc");
+	if (procAddr2 == NULL) { return printError("callWndProc not found.\n"); }
+
+	handle = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
+	if (handle == NULL) { printf("WH_WNDPROC could not be hooked.\n"); }
+
+
+	// Hook #3
+	procAddr3 = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
+	if (procAddr3 == NULL) { return printError("callWndProcRet not found.\n"); }
+
+	handle = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
 	if (handle == NULL) { printf("WH_WNDPROCRET could not be hooked.\n"); }
 
 

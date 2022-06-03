@@ -1,37 +1,22 @@
 #include "stdafx.h"
 #include <stdio.h>
 #include <windows.h>
-#include "dllmain.h"
+#include <commctrl.h>
 
-HWND m_hwnd = NULL;
-DWORD m_pid = 0;
-LONG OldWndProc;
+#pragma comment(lib, "comctl32.lib")
 
-DWORD WINAPI init(LPVOID);
-DWORD WINAPI deinit(LPVOID);
-LRESULT CALLBACK NewWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+BOOL m_hooked = FALSE;
+LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 	/* open file */
 	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\temp.txt", "a+");
+	fopen_s(&file, "c:\\users\\me\\debug\\temp.txt", "a+");
 
 	switch (Reason) {
 	case DLL_PROCESS_ATTACH:
 	{
 		fprintf(file, "DLL attach function called.\n");
-		//CreateThread(0, NULL, (LPTHREAD_START_ROUTINE)&init, NULL, NULL, NULL);
-
-		//Find the window of the Injectee using its title
-		HWND hwnd = FindWindow(L"Notepad", NULL);
-
-		//If the window found, then change it's window proc
-		if (hwnd)
-		{
-			fprintf(file, "hwnd found\n");
-			OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (LONG_PTR)NewWndProc);
-		}
-		fprintf(file, "patched\n");
 	}
 	break;
 	case DLL_PROCESS_DETACH:
@@ -52,24 +37,6 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 	return TRUE;
 }
 
-DWORD WINAPI init(LPVOID)
-{
-	HWND hwnd = FindWindow(L"Notepad", NULL);
-	OldWndProc = SetWindowLongPtr(hwnd, GWLP_WNDPROC, (long)NewWndProc);
-
-	return TRUE;
-}
-
-DWORD WINAPI deinit(LPVOID)
-{
-	HWND hwnd = FindWindow(L"Notepad", NULL);
-	SetWindowLongPtr(hwnd, GWLP_WNDPROC, (long)OldWndProc);
-
-	return TRUE;
-}
-
-
-
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM wParam, LPARAM lParam) {
 	if (code < 0) // Do not process
@@ -79,7 +46,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM 
 	else
 	{
 		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\function4.txt", "a+");
+		fopen_s(&file, "c:\\users\\me\\debug\\function4.txt", "a+");
 		fprintf(file, "Function keyboard_hook called: %c\n", wParam);
 		fclose(file);
 		return(CallNextHookEx(NULL, code, wParam, lParam));
@@ -87,8 +54,33 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM 
 }
 
 // Reference: https://microsoft.public.vc.language.narkive.com/6oyFmtSV/wm-getminmaxinfo-setwindowshookex
-extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARAM wParam, LPARAM lParam) {
+extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM wParam, LPARAM lParam)
+{
+	// Only handle messages from other processes
+	if (code >= 0)
+	{
+		auto data = reinterpret_cast<CWPSTRUCT*>(lParam);
+		switch (data->message)
+		{
+		case WM_GETMINMAXINFO:
+			if (data->hwnd && (m_hooked == FALSE)) {
+				m_hooked = SetWindowSubclass(data->hwnd, &hookWndProc, 1, 0);
+				FILE* file;
+				fopen_s(&file, "c:\\users\\me\\debug\\function7.txt", "a+");
+				fprintf(file, "subclassed\n");
+				fclose(file);
 
+			}
+
+			break;
+		}
+	}
+
+	return(CallNextHookEx(NULL, code, wParam, lParam));
+}
+
+extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARAM wParam, LPARAM lParam)
+{
 	// Only handle messages from other processes
 	if (code >= 0)
 	{
@@ -96,46 +88,50 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 		switch (data->message)
 		{
 		case WM_GETMINMAXINFO:
-			//auto minmax = reinterpret_cast<MINMAXINFO *>(data->lParam);
-//            minmax->ptMinTrackSize.x = 300;
-//            minmax->ptMaxTrackSize.x = 300;
-			LPPOINT lppt = (LPPOINT)data->lParam;
-			lppt[3].x = 100; // Set minimum width to current width
-			lppt[4].x = 100;
-
-
+			// Remove our hook
+			if (data->hwnd)
+			{
+				if (RemoveWindowSubclass(data->hwnd, &hookWndProc, 1))
+				{
+					m_hooked = FALSE;
+					FILE* file;
+					fopen_s(&file, "c:\\users\\me\\debug\\function7.txt", "a+");
+					fprintf(file, "unsubclassed\n");
+					fclose(file);
+				}
+			}
 			break;
 		}
 	}
 
-
 	return(CallNextHookEx(NULL, code, wParam, lParam));
 }
 
-LRESULT CALLBACK NewWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
-	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\function6.txt", "a+");
-	fprintf(file, "Function wndproc called\n");
-	fclose(file);
-
 	switch (msg)
 	{
+	case WM_MOUSEMOVE:
+		break;
+
+	case WM_LBUTTONDOWN:
+		break;
+
 	case WM_GETMINMAXINFO:
-		//auto minmax = reinterpret_cast<MINMAXINFO *>(data->lParam);
-//            minmax->ptMinTrackSize.x = 300;
-//            minmax->ptMaxTrackSize.x = 300;
-		LPPOINT lppt = (LPPOINT)lParam;
-		lppt[3].x = 100; // Set minimum width to current width
-		lppt[4].x = 100;
+	{
+		auto minmax = reinterpret_cast<MINMAXINFO *>(lParam);
+		minmax->ptMinTrackSize.x = 2200;
+		minmax->ptMinTrackSize.y = 1400;
+		minmax->ptMaxTrackSize.x = 2200;
+		minmax->ptMaxTrackSize.y = 1400;
+	}
+	break;
 
-		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\function5.txt", "a+");
-		fprintf(file, "Function wndproc called\n");
-		fclose(file);
-
+	case WM_NCDESTROY:
+		//RemoveWindowSubclass(hwnd, &hookWndProc, 1);
 		break;
 	}
 
-	return CallWindowProc((WNDPROC)OldWndProc, hwnd, msg, wParam, lParam);
+	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
+
