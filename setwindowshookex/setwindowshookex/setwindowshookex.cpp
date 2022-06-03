@@ -23,7 +23,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (dll == NULL) { return printError("The DLL could not be found.\n"); }
 
 	DWORD procID;
-	HWND targetWnd = FindWindow(L"Notepad", NULL);
+	HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
