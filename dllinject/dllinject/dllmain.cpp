@@ -60,18 +60,34 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM w
 	if (code >= 0)
 	{
 		auto data = reinterpret_cast<CWPSTRUCT*>(lParam);
+		auto hwnd = data->hwnd;
+
 		switch (data->message)
 		{
 		case WM_GETMINMAXINFO:
-			if (data->hwnd && (m_hooked == FALSE)) {
-				m_hooked = SetWindowSubclass(data->hwnd, &hookWndProc, 1, 0);
-				FILE* file;
-				fopen_s(&file, "c:\\users\\me\\debug\\function7.txt", "a+");
-				fprintf(file, "subclassed\n");
-				fclose(file);
+			FILE* file;
+			fopen_s(&file, "c:\\users\\me\\debug\\callWndProc.txt", "a+");
+			fprintf(file, "Entered callWndProc\n");
 
+			if (hwnd && (m_hooked == FALSE)) {
+				if (GetAncestor(hwnd, GA_ROOT) != hwnd)
+				{
+					fprintf(file, "wasn't parent\n");
+					goto end;
+				}
+				m_hooked = SetWindowSubclass(data->hwnd, &hookWndProc, 1, 0);
+				if (m_hooked)
+				{
+					fprintf(file, "subclassed\n");
+				}
+				else
+				{
+					fprintf(file, "error subclassing\n");
+				}
 			}
 
+			end:
+			fclose(file);
 			break;
 		}
 	}
@@ -85,21 +101,29 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 	if (code >= 0)
 	{
 		auto data = reinterpret_cast<CWPRETSTRUCT*>(lParam);
+		auto hwnd = data->hwnd;
+
 		switch (data->message)
 		{
 		case WM_GETMINMAXINFO:
+			FILE* file;
+			fopen_s(&file, "c:\\users\\me\\debug\\callWndProc.txt", "a+");
+			fprintf(file, "Entered callWndProcRet\n");
+
 			// Remove our hook
-			if (data->hwnd)
+			if (hwnd && (m_hooked == TRUE))
 			{
 				if (RemoveWindowSubclass(data->hwnd, &hookWndProc, 1))
 				{
 					m_hooked = FALSE;
-					FILE* file;
-					fopen_s(&file, "c:\\users\\me\\debug\\function7.txt", "a+");
 					fprintf(file, "unsubclassed\n");
-					fclose(file);
+				}
+				else
+				{
+					fprintf(file, "error removing subclass\n");
 				}
 			}
+			fclose(file);
 			break;
 		}
 	}
