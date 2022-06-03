@@ -24,6 +24,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	DWORD procID;
 	HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
+	//HWND targetWnd = FindWindow(L"Notepad", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);

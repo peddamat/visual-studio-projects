@@ -131,6 +131,9 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 	return(CallNextHookEx(NULL, code, wParam, lParam));
 }
 
+#define MAX_X 2200
+#define MAX_Y 1200
+
 LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
 	switch (msg)
@@ -143,12 +146,22 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 
 	case WM_GETMINMAXINFO:
 	{
+		// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
 		auto minmax = reinterpret_cast<MINMAXINFO *>(lParam);
-		minmax->ptMinTrackSize.x = 2200;
-		minmax->ptMinTrackSize.y = 1400;
-		minmax->ptMaxTrackSize.x = 2200;
-		minmax->ptMaxTrackSize.y = 1400;
+
+		minmax->ptMaxSize.x = MAX_X;
+		minmax->ptMaxSize.y = MAX_Y;
+
+		minmax->ptMinTrackSize.x = MAX_X;
+		minmax->ptMinTrackSize.y = MAX_Y;
+
+		minmax->ptMaxTrackSize.x = MAX_X;
+		minmax->ptMaxTrackSize.y = MAX_Y;
 	}
+	break;
+
+	case WM_SYSCOMMAND:
+		//if (wParam == SC_MAXIMIZE) 
 	break;
 
 	case WM_NCDESTROY:
