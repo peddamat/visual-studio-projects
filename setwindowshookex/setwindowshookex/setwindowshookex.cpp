@@ -5,6 +5,8 @@
 #include <winuser.h>
 #include <array>
 
+BOOL SaveWindowSizeAndOrigin(HWND window, POINT pt) noexcept;
+
 int printError(char* msg)
 {
 	printf("%s\n", msg);
@@ -28,6 +30,12 @@ int _tmain(int argc, _TCHAR* argv[])
 	//HWND targetWnd = FindWindow(L"Notepad", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
+	// Set the max dimensions of window
+	POINT pt;
+	pt.x = 2200;
+	pt.y = 1200;
+	if (!SaveWindowSizeAndOrigin(targetWnd, pt)) { return printError("Couldn't set max dimensions\n"); }
+
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
 	// Hook #1
@@ -43,7 +51,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (procAddr2 == NULL) { return printError("callWndProc not found.\n"); }
 
 	handle = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
-	if (handle == NULL) { printf("WH_WNDPROC could not be hooked.\n"); }
+	if (handle == NULL) { return printError("WH_WNDPROC could not be hooked.\n"); }
 
 
 	// Hook #3
@@ -51,7 +59,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (procAddr3 == NULL) { return printError("callWndProcRet not found.\n"); }
 
 	handle = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
-	if (handle == NULL) { printf("WH_WNDPROCRET could not be hooked.\n"); }
+	if (handle == NULL) { return printError("WH_WNDPROCRET could not be hooked.\n"); }
 
 
 	DWORD_PTR result;
@@ -61,41 +69,40 @@ int _tmain(int argc, _TCHAR* argv[])
 	printf("Program successfully hooked.\nPress enter to unhook the function and stop the program.\n");
 	getchar();
 
+	// TODO: Clean-up added window property
 	UnhookWindowsHookEx(handle);
 
 	return 0;
 }
 
 
-const wchar_t PropertyRestoreSizeID[] = L"FancyZones_RestoreSize";
+const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 
-void SaveWindowSizeAndOrigin(HWND window) noexcept
+BOOL SaveWindowSizeAndOrigin(HWND window, POINT pt) noexcept
 {
-    HANDLE handle = GetPropW(window, PropertyRestoreSizeID);
+    HANDLE handle = GetPropW(window, PropertyZoneSizeID);
     if (handle)
     {
         // Size already set, skip
-        return;
+        return true;
     }
 
-    RECT rect;
-    if (GetWindowRect(window, &rect))
-    {
-        float width = static_cast<float>(rect.right - rect.left);
-        float height = static_cast<float>(rect.bottom - rect.top);
-        float originX = static_cast<float>(rect.left);
-        float originY = static_cast<float>(rect.top);
+	//DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), width, height);
+	//DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), originX, originY);
 
-        //DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), width, height);
-        //DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), originX, originY);
+	std::array<int, 2> windowSizeData = { static_cast<int>(pt.x), static_cast<int>(pt.y) };
+	//std::array<int, 2> windowOriginData = { static_cast<int>(originX), static_cast<int>(originY) };
 
-        std::array<int, 2> windowSizeData = { static_cast<int>(width), static_cast<int>(height) };
-        std::array<int, 2> windowOriginData = { static_cast<int>(originX), static_cast<int>(originY) };
-        HANDLE rawData;
-        memcpy(&rawData, windowSizeData.data(), sizeof rawData);
-        SetPropW(window, PropertyRestoreSizeID, rawData);
-        //memcpy(&rawData, windowOriginData.data(), sizeof rawData);
-        //SetPropW(window, PropertyRestoreOriginID, rawData);
-    }
+	HANDLE rawData;
+
+	memcpy(&rawData, windowSizeData.data(), sizeof rawData);
+	if (SetPropW(window, PropertyZoneSizeID, rawData))
+	{
+		return true;
+	}
+
+	//memcpy(&rawData, windowOriginData.data(), sizeof rawData);
+	//SetPropW(window, PropertyRestoreOriginID, rawData);
+
+	return false;
 }
-

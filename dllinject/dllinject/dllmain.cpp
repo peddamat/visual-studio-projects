@@ -8,11 +8,12 @@
 
 BOOL m_hooked = FALSE;
 LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+BOOL RestoreWindowSize(HWND window, POINT& pt) noexcept;
 
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 	/* open file */
 	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\debug\\temp.txt", "a+");
+	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 
 	switch (Reason) {
 	case DLL_PROCESS_ATTACH:
@@ -47,7 +48,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM 
 	else
 	{
 		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\debug\\function4.txt", "a+");
+		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 		fprintf(file, "Function keyboard_hook called: %c\n", wParam);
 		fclose(file);
 		return(CallNextHookEx(NULL, code, wParam, lParam));
@@ -67,7 +68,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM w
 		{
 		case WM_GETMINMAXINFO:
 			FILE* file;
-			fopen_s(&file, "c:\\users\\me\\debug\\callWndProc.txt", "a+");
+			fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 			fprintf(file, "Entered callWndProc\n");
 
 			if (hwnd && (m_hooked == FALSE)) {
@@ -108,7 +109,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 		{
 		case WM_GETMINMAXINFO:
 			FILE* file;
-			fopen_s(&file, "c:\\users\\me\\debug\\callWndProc.txt", "a+");
+			fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 			fprintf(file, "Entered callWndProcRet\n");
 
 			// Remove our hook
@@ -147,17 +148,31 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 
 	case WM_GETMINMAXINFO:
 	{
-		// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
-		auto minmax = reinterpret_cast<MINMAXINFO *>(lParam);
+		FILE* file;
+		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
+		fprintf(file, "Entered hookWndProc\n");
 
-		minmax->ptMaxSize.x = MAX_X;
-		minmax->ptMaxSize.y = MAX_Y;
+		POINT maxSize = { 0,0 };
+		if (RestoreWindowSize(hwnd, maxSize))
+		{
+			fprintf(file, "found maxsize prop\n");
+			// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
+			auto minmax = reinterpret_cast<MINMAXINFO*>(lParam);
 
-		minmax->ptMinTrackSize.x = MAX_X;
-		minmax->ptMinTrackSize.y = MAX_Y;
+			minmax->ptMaxSize.x = maxSize.x;
+			minmax->ptMaxSize.y = maxSize.y;
 
-		minmax->ptMaxTrackSize.x = MAX_X;
-		minmax->ptMaxTrackSize.y = MAX_Y;
+			minmax->ptMinTrackSize.x = maxSize.x;
+			minmax->ptMinTrackSize.y = maxSize.y;
+
+			minmax->ptMaxTrackSize.x = maxSize.x;
+			minmax->ptMaxTrackSize.y = maxSize.y;
+		}
+		else
+		{
+			fprintf(file, "couldn't find maxsize prop!\n");
+		}
+		fclose(file);
 	}
 	break;
 
@@ -174,29 +189,26 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 }
 
 
-const wchar_t PropertyRestoreSizeID[] = L"FancyZones_RestoreSize";
+const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 
-void RestoreWindowSize(HWND window) noexcept
+BOOL RestoreWindowSize(HWND window, POINT &pt) noexcept
 {
-    auto windowSizeData = GetPropW(window, PropertyRestoreSizeID);
+    auto windowSizeData = GetPropW(window, PropertyZoneSizeID);
     if (windowSizeData)
     {
         std::array<int, 2> windowSize;
         memcpy(windowSize.data(), &windowSizeData, sizeof windowSize);
 
-        float windowWidth = static_cast<float>(windowSize[0]), windowHeight = static_cast<float>(windowSize[1]);
+		pt.x = static_cast<float>(windowSize[0]);
+		pt.y = static_cast<float>(windowSize[1]);
+
+		return true;
 
         // {width, height}
         //DPIAware::Convert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), windowWidth, windowHeight);
 
-        RECT rect;
-        if (GetWindowRect(window, &rect))
-        {
-            rect.right = rect.left + static_cast<int>(windowWidth);
-            rect.bottom = rect.top + static_cast<int>(windowHeight);
-            //SizeWindowToRect(window, rect);
-        }
-
-        //::RemoveProp(window, PropertyRestoreSizeID);
+        //::RemoveProp(window, PropertyZoneSizeID);
     }
+
+	return false;
 }
