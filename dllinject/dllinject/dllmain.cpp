@@ -7,8 +7,9 @@
 #pragma comment(lib, "comctl32.lib")
 
 BOOL m_hooked = FALSE;
-LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 
+HWND m_hwnd = NULL;
 const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
 BOOL GetZoneSizeAndOrigin(HWND window, POINT& zoneSize, POINT& zoneOrigin) noexcept;
@@ -65,39 +66,40 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM w
 	// Only handle messages from other processes
 	if (code >= 0)
 	{
+		if (m_hwnd != NULL)
+			goto end;
+
 		auto data = reinterpret_cast<CWPSTRUCT*>(lParam);
 		auto hwnd = data->hwnd;
 
-		switch (data->message)
+		char szBuff[64];
+		sprintf(szBuff, "%p", hwnd);
+
+		FILE* file;
+		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
+		fprintf(file, "Entered callWndProc: %p\n", szBuff);
+
+		if (GetAncestor(hwnd, GA_ROOT) == hwnd)
 		{
-		case WM_GETMINMAXINFO:
-			FILE* file;
-			fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-			fprintf(file, "Entered callWndProc\n");
-
-			if (hwnd && (m_hooked == FALSE)) {
-				if (GetAncestor(hwnd, GA_ROOT) != hwnd)
-				{
-					fprintf(file, "wasn't parent\n");
-					goto end;
-				}
-				m_hooked = SetWindowSubclass(data->hwnd, &hookWndProc, 1, 0);
-				if (m_hooked)
-				{
-					fprintf(file, "subclassed\n");
-				}
-				else
-				{
-					fprintf(file, "error subclassing\n");
-				}
+			if (SetWindowSubclass(hwnd, &hookWndProc, 1, 0))
+			{
+				fprintf(file, "- subclassed\n");
+				m_hwnd = hwnd;
 			}
-
-			end:
-			fclose(file);
-			break;
+			else
+			{
+				fprintf(file, "! error subclassing\n");
+			}
 		}
+		else
+		{
+			fprintf(file, "! wasn't parent\n");
+		}
+
+		fclose(file);
 	}
 
+	end:
 	return(CallNextHookEx(NULL, code, wParam, lParam));
 }
 
@@ -106,42 +108,40 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 	// Only handle messages from other processes
 	if (code >= 0)
 	{
+		if (m_hwnd == NULL)
+			goto end;
+
 		auto data = reinterpret_cast<CWPRETSTRUCT*>(lParam);
-		auto hwnd = data->hwnd;
 
-		switch (data->message)
+		FILE* file;
+		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
+		fprintf(file, "Entered callWndProcRet\n");
+
+		// Remove our hook
+		if (RemoveWindowSubclass(data->hwnd, &hookWndProc, 1))
 		{
-		case WM_GETMINMAXINFO:
-			FILE* file;
-			fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-			fprintf(file, "Entered callWndProcRet\n");
-
-			// Remove our hook
-			if (hwnd && (m_hooked == TRUE))
-			{
-				if (RemoveWindowSubclass(data->hwnd, &hookWndProc, 1))
-				{
-					m_hooked = FALSE;
-					fprintf(file, "unsubclassed\n");
-				}
-				else
-				{
-					fprintf(file, "error removing subclass\n");
-				}
-			}
-			fclose(file);
-			break;
+			fprintf(file, "unsubclassed\n");
+			m_hwnd = NULL;
 		}
+		else
+		{
+			fprintf(file, "error removing subclass\n");
+		}
+		fclose(file);
 	}
 
+	end:
 	return(CallNextHookEx(NULL, code, wParam, lParam));
 }
 
 #define MAX_X 2200
 #define MAX_Y 1200
 
-LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
+	if (!GetPropW(hwnd, PropertyZoneSizeID))
+		goto end;
+
 	switch (msg)
 	{
 	case WM_MOUSEMOVE:
@@ -194,6 +194,7 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 		break;
 	}
 
+	end:
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
 

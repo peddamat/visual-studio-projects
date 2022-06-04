@@ -4,6 +4,9 @@
 #include <stdio.h>
 #include <winuser.h>
 #include <array>
+#include <commctrl.h>
+
+#pragma comment(lib, "comctl32.lib")
 
 const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
@@ -28,7 +31,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (dll == NULL) { return printError("The DLL could not be found.\n"); }
 
 	DWORD procID;
-	HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
+	HWND targetWnd = reinterpret_cast<HWND>(0x00350DA0);
+	//HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
 	//HWND targetWnd = FindWindow(L"Notepad", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
