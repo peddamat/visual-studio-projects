@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <windows.h>
 #include <commctrl.h>
+#include <array>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -172,3 +173,30 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
 
+
+const wchar_t PropertyRestoreSizeID[] = L"FancyZones_RestoreSize";
+
+void RestoreWindowSize(HWND window) noexcept
+{
+    auto windowSizeData = GetPropW(window, PropertyRestoreSizeID);
+    if (windowSizeData)
+    {
+        std::array<int, 2> windowSize;
+        memcpy(windowSize.data(), &windowSizeData, sizeof windowSize);
+
+        float windowWidth = static_cast<float>(windowSize[0]), windowHeight = static_cast<float>(windowSize[1]);
+
+        // {width, height}
+        //DPIAware::Convert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), windowWidth, windowHeight);
+
+        RECT rect;
+        if (GetWindowRect(window, &rect))
+        {
+            rect.right = rect.left + static_cast<int>(windowWidth);
+            rect.bottom = rect.top + static_cast<int>(windowHeight);
+            //SizeWindowToRect(window, rect);
+        }
+
+        //::RemoveProp(window, PropertyRestoreSizeID);
+    }
+}

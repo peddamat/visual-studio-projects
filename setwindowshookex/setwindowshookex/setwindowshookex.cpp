@@ -3,6 +3,7 @@
 #include <conio.h>
 #include <stdio.h>
 #include <winuser.h>
+#include <array>
 
 int printError(char* msg)
 {
@@ -66,4 +67,35 @@ int _tmain(int argc, _TCHAR* argv[])
 }
 
 
+const wchar_t PropertyRestoreSizeID[] = L"FancyZones_RestoreSize";
+
+void SaveWindowSizeAndOrigin(HWND window) noexcept
+{
+    HANDLE handle = GetPropW(window, PropertyRestoreSizeID);
+    if (handle)
+    {
+        // Size already set, skip
+        return;
+    }
+
+    RECT rect;
+    if (GetWindowRect(window, &rect))
+    {
+        float width = static_cast<float>(rect.right - rect.left);
+        float height = static_cast<float>(rect.bottom - rect.top);
+        float originX = static_cast<float>(rect.left);
+        float originY = static_cast<float>(rect.top);
+
+        //DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), width, height);
+        //DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), originX, originY);
+
+        std::array<int, 2> windowSizeData = { static_cast<int>(width), static_cast<int>(height) };
+        std::array<int, 2> windowOriginData = { static_cast<int>(originX), static_cast<int>(originY) };
+        HANDLE rawData;
+        memcpy(&rawData, windowSizeData.data(), sizeof rawData);
+        SetPropW(window, PropertyRestoreSizeID, rawData);
+        //memcpy(&rawData, windowOriginData.data(), sizeof rawData);
+        //SetPropW(window, PropertyRestoreOriginID, rawData);
+    }
+}
 
