@@ -21,17 +21,12 @@ int printError(char* msg)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	HHOOK handle = NULL;
-	HOOKPROC procAddr = NULL;
-	HOOKPROC procAddr2 = NULL;
-	HOOKPROC procAddr3 = NULL;
-
 	// Load library in which we'll be hooking our functions.
 	HMODULE dll = LoadLibrary(L"dllinject.dll");
 	if (dll == NULL) { return printError("The DLL could not be found.\n"); }
 
 	DWORD procID;
-	HWND targetWnd = reinterpret_cast<HWND>(0x00350DA0);
+	HWND targetWnd = reinterpret_cast<HWND>(0x00070DAA);
 	//HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
 	//HWND targetWnd = FindWindow(L"Notepad", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
@@ -45,27 +40,27 @@ int _tmain(int argc, _TCHAR* argv[])
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
 	// Hook #1
-	//procAddr = (HOOKPROC)GetProcAddress(dll, "keyboardProc");
+	//HOOKPROC procAddr = (HOOKPROC)GetProcAddress(dll, "keyboardProc");
 	//if (procAddr== NULL) { return printError("keyboardProc not found.\n"); }
 
-	//handle = SetWindowsHookEx(WH_KEYBOARD, procAddr, dll, threadID);
+	//HHOOK handle = SetWindowsHookEx(WH_KEYBOARD, procAddr, dll, threadID);
 	//if (handle == NULL) { printf("WH_KEYBOARD could not be hooked.\n"); }
 
 
 	// Hook #2
-	procAddr2 = (HOOKPROC)GetProcAddress(dll, "callWndProc");
+	HOOKPROC procAddr2 = (HOOKPROC)GetProcAddress(dll, "callWndProc");
 	if (procAddr2 == NULL) { return printError("callWndProc not found.\n"); }
 
-	handle = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
-	if (handle == NULL) { return printError("WH_WNDPROC could not be hooked.\n"); }
+	HHOOK handle2 = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
+	if (handle2 == NULL) { return printError("WH_WNDPROC could not be hooked.\n"); }
 
 
 	// Hook #3
-	procAddr3 = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
+	HOOKPROC procAddr3 = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
 	if (procAddr3 == NULL) { return printError("callWndProcRet not found.\n"); }
 
-	handle = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
-	if (handle == NULL) { return printError("WH_WNDPROCRET could not be hooked.\n"); }
+	HHOOK handle3 = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
+	if (handle3 == NULL) { return printError("WH_WNDPROCRET could not be hooked.\n"); }
 
 
 	DWORD_PTR result;
@@ -76,7 +71,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	getchar();
 
 	// TODO: Clean-up added window property
-	UnhookWindowsHookEx(handle);
+	UnhookWindowsHookEx(handle2);
+	UnhookWindowsHookEx(handle3);
 	RemoveProp(targetWnd, PropertyZoneSizeID);
 	RemoveProp(targetWnd, PropertyZoneOriginID);
 

@@ -113,6 +113,9 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARA
 
 		auto data = reinterpret_cast<CWPRETSTRUCT*>(lParam);
 
+		if (data->hwnd != m_hwnd)
+			goto end;
+
 		FILE* file;
 		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 		fprintf(file, "Entered callWndProcRet\n");
@@ -150,7 +153,7 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 	case WM_LBUTTONDOWN:
 		break;
 
-	case WM_GETMINMAXINFO:
+	case WM_WINDOWPOSCHANGING:
 	{
 		FILE* file;
 		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
@@ -163,25 +166,23 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 		{
 			fprintf(file, "found maxsize prop\n");
 			// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
-			auto minmax = reinterpret_cast<MINMAXINFO*>(lParam);
+			auto minmax = reinterpret_cast<WINDOWPOS*>(lParam);
 
-			minmax->ptMaxSize.x = zoneSize.x;
-			minmax->ptMaxSize.y = zoneSize.y;
+			minmax->cx = zoneSize.x;
+			minmax->cy = zoneSize.y;
 
-			minmax->ptMaxPosition.x = zoneOrigin.x;
-			minmax->ptMaxPosition.y = zoneOrigin.y;
+			minmax->x = zoneOrigin.x;
+			minmax->y = zoneOrigin.y;
 
-			minmax->ptMinTrackSize.x = zoneSize.x;
-			minmax->ptMinTrackSize.y = zoneSize.y;
-
-			minmax->ptMaxTrackSize.x = zoneSize.x;
-			minmax->ptMaxTrackSize.y = zoneSize.y;
+			//minmax->flags = SWP_NOMOVE | SWP_NOSIZE;
 		}
 		else
 		{
 			fprintf(file, "couldn't find maxsize prop!\n");
 		}
 		fclose(file);
+
+		return 0;
 	}
 	break;
 
