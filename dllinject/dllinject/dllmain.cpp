@@ -8,7 +8,11 @@
 
 BOOL m_hooked = FALSE;
 LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
-BOOL RestoreWindowSize(HWND window, POINT& pt) noexcept;
+
+const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
+const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
+BOOL GetZoneSizeAndOrigin(HWND window, POINT& zoneSize, POINT& zoneOrigin) noexcept;
+
 
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 	/* open file */
@@ -152,21 +156,26 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 		fprintf(file, "Entered hookWndProc\n");
 
-		POINT maxSize = { 0,0 };
-		if (RestoreWindowSize(hwnd, maxSize))
+		POINT zoneSize = { 0,0 };
+		POINT zoneOrigin = { 0,0 };
+
+		if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
 		{
 			fprintf(file, "found maxsize prop\n");
 			// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
 			auto minmax = reinterpret_cast<MINMAXINFO*>(lParam);
 
-			minmax->ptMaxSize.x = maxSize.x;
-			minmax->ptMaxSize.y = maxSize.y;
+			minmax->ptMaxSize.x = zoneSize.x;
+			minmax->ptMaxSize.y = zoneSize.y;
 
-			minmax->ptMinTrackSize.x = maxSize.x;
-			minmax->ptMinTrackSize.y = maxSize.y;
+			minmax->ptMaxPosition.x = zoneOrigin.x;
+			minmax->ptMaxPosition.y = zoneOrigin.y;
 
-			minmax->ptMaxTrackSize.x = maxSize.x;
-			minmax->ptMaxTrackSize.y = maxSize.y;
+			minmax->ptMinTrackSize.x = zoneSize.x;
+			minmax->ptMinTrackSize.y = zoneSize.y;
+
+			minmax->ptMaxTrackSize.x = zoneSize.x;
+			minmax->ptMaxTrackSize.y = zoneSize.y;
 		}
 		else
 		{
@@ -189,26 +198,32 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 }
 
 
-const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
-
-BOOL RestoreWindowSize(HWND window, POINT &pt) noexcept
+BOOL GetZoneSizeAndOrigin(HWND window, POINT &zoneSize, POINT &zoneOrigin) noexcept
 {
-    auto windowSizeData = GetPropW(window, PropertyZoneSizeID);
-    if (windowSizeData)
-    {
-        std::array<int, 2> windowSize;
-        memcpy(windowSize.data(), &windowSizeData, sizeof windowSize);
+	// Retrieve the zone size
+    auto zsProp = GetPropW(window, PropertyZoneSizeID);
+	if (!zsProp)
+		return false;
 
-		pt.x = static_cast<float>(windowSize[0]);
-		pt.y = static_cast<float>(windowSize[1]);
+	std::array<int, 2> zsArray;
+	memcpy(zsArray.data(), &zsProp, sizeof zsArray);
 
-		return true;
+	zoneSize.x = static_cast<float>(zsArray[0]);
+	zoneSize.y = static_cast<float>(zsArray[1]);
 
-        // {width, height}
-        //DPIAware::Convert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), windowWidth, windowHeight);
+	// Retrieve the zone position
+    auto zoProp = GetPropW(window, PropertyZoneOriginID);
+	if (!zoProp)
+		return false;
 
-        //::RemoveProp(window, PropertyZoneSizeID);
-    }
+	std::array<int, 2> zoArray;
+	memcpy(zoArray.data(), &zoProp, sizeof zoArray);
 
-	return false;
+	zoneOrigin.x = static_cast<float>(zoArray[0]);
+	zoneOrigin.y = static_cast<float>(zoArray[1]);
+
+	// {width, height}
+	//DPIAware::Convert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), windowWidth, windowHeight);
+
+	return true;
 }

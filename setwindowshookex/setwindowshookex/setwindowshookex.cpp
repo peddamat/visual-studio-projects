@@ -5,7 +5,9 @@
 #include <winuser.h>
 #include <array>
 
-BOOL SaveWindowSizeAndOrigin(HWND window, POINT pt) noexcept;
+const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
+const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
+BOOL SaveZoneSizeAndOrigin(HWND window, POINT maxSize, POINT maxPosition) noexcept;
 
 int printError(char* msg)
 {
@@ -31,10 +33,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
 	// Set the max dimensions of window
-	POINT pt;
-	pt.x = 2200;
-	pt.y = 1200;
-	if (!SaveWindowSizeAndOrigin(targetWnd, pt)) { return printError("Couldn't set max dimensions\n"); }
+	POINT maxSize{ 2200, 1200 };
+	POINT maxPosition{ 500, 0 };
+
+	if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) { return printError("Couldn't set max dimensions\n"); }
 
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
@@ -71,38 +73,40 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// TODO: Clean-up added window property
 	UnhookWindowsHookEx(handle);
+	RemoveProp(targetWnd, PropertyZoneSizeID);
+	RemoveProp(targetWnd, PropertyZoneOriginID);
 
 	return 0;
 }
 
 
-const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
-
-BOOL SaveWindowSizeAndOrigin(HWND window, POINT pt) noexcept
+BOOL SaveZoneSizeAndOrigin(HWND window, POINT zoneSize, POINT zoneOrigin) noexcept
 {
-    HANDLE handle = GetPropW(window, PropertyZoneSizeID);
-    if (handle)
+    if (GetPropW(window, PropertyZoneSizeID) && GetPropW(window, PropertyZoneOriginID))
     {
-        // Size already set, skip
+        // Both props are already set, abort!
         return true;
     }
 
 	//DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), width, height);
 	//DPIAware::InverseConvert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), originX, originY);
 
-	std::array<int, 2> windowSizeData = { static_cast<int>(pt.x), static_cast<int>(pt.y) };
-	//std::array<int, 2> windowOriginData = { static_cast<int>(originX), static_cast<int>(originY) };
+	std::array<int, 2> windowSizeData = { static_cast<int>(zoneSize.x), static_cast<int>(zoneSize.y) };
+	std::array<int, 2> windowOriginData = { static_cast<int>(zoneOrigin.x), static_cast<int>(zoneOrigin.y) };
 
 	HANDLE rawData;
 
 	memcpy(&rawData, windowSizeData.data(), sizeof rawData);
-	if (SetPropW(window, PropertyZoneSizeID, rawData))
+	if (!SetPropW(window, PropertyZoneSizeID, rawData))
 	{
-		return true;
+		return false;
 	}
 
-	//memcpy(&rawData, windowOriginData.data(), sizeof rawData);
-	//SetPropW(window, PropertyRestoreOriginID, rawData);
+	memcpy(&rawData, windowOriginData.data(), sizeof rawData);
+	if (!SetPropW(window, PropertyZoneOriginID, rawData))
+	{
+		return false;
+	}
 
-	return false;
+	return true;
 }
