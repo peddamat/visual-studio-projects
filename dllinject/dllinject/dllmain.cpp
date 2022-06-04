@@ -22,12 +22,19 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 
 	switch (Reason) {
 	case DLL_PROCESS_ATTACH:
-	{
 		fprintf(file, "DLL attach function called.\n");
-	}
 	break;
 	case DLL_PROCESS_DETACH:
 		fprintf(file, "DLL detach function called.\n");
+		if (RemoveWindowSubclass(m_hwnd, &hookWndProc, 1))
+		{
+			fprintf(file, "unsubclassed\n");
+		}
+		else
+		{
+			fprintf(file, "error removing subclass\n");
+		}
+
 		//CreateThread(0, NULL, (LPTHREAD_START_ROUTINE)&deinit, NULL, NULL, NULL);
 		break;
 	case DLL_THREAD_ATTACH:
@@ -60,47 +67,83 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK keyboardProc(int code, WPARAM 
 	}
 }
 
-// Reference: https://microsoft.public.vc.language.narkive.com/6oyFmtSV/wm-getminmaxinfo-setwindowshookex
-extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM wParam, LPARAM lParam)
-{
-	// Only handle messages from other processes
-	if (code >= 0)
+extern "C" __declspec(dllexport) LRESULT CALLBACK getMsgProc(int code, WPARAM wParam, LPARAM lParam) {
+	if (code < 0) // Do not process
 	{
-		if (m_hwnd != NULL)
-			goto end;
+		return CallNextHookEx(NULL, code, wParam, lParam);
+	}
 
-		auto data = reinterpret_cast<CWPSTRUCT*>(lParam);
-		auto hwnd = data->hwnd;
+	auto msg = reinterpret_cast<MSG*>(lParam);
+	HWND hwnd = NULL;
 
-		char szBuff[64];
-		sprintf(szBuff, "%p", hwnd);
+	FILE* file;
+	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 
-		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-		fprintf(file, "Entered callWndProc: %p\n", szBuff);
+	switch (msg->message)
+	{
+	case WM_USER + 666:
+		fprintf(file, "Subclass start!\n");
 
-		if (GetAncestor(hwnd, GA_ROOT) == hwnd)
+		hwnd = reinterpret_cast<HWND>(msg->wParam);
+		if (SetWindowSubclass(hwnd, &hookWndProc, 1, 0))
 		{
-			if (SetWindowSubclass(hwnd, &hookWndProc, 1, 0))
-			{
-				fprintf(file, "- subclassed\n");
-				m_hwnd = hwnd;
-			}
-			else
-			{
-				fprintf(file, "! error subclassing\n");
-			}
+			fprintf(file, "- subclassed\n");
 		}
 		else
 		{
-			fprintf(file, "! wasn't parent\n");
+			fprintf(file, "~ error subclassing\n");
 		}
-
-		fclose(file);
+		m_hwnd = hwnd;
+		break;
 	}
 
-	end:
+	fclose(file);
+
 	return(CallNextHookEx(NULL, code, wParam, lParam));
+}
+
+// Reference: https://microsoft.public.vc.language.narkive.com/6oyFmtSV/wm-getminmaxinfo-setwindowshookex
+extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProc(int code, WPARAM wParam, LPARAM lParam)
+{
+	return(CallNextHookEx(NULL, code, wParam, lParam));
+	//// Only handle messages from other processes
+	//if (code >= 0)
+	//{
+	//	if (m_hwnd != NULL)
+	//		goto end;
+
+	//	auto data = reinterpret_cast<CWPSTRUCT*>(lParam);
+	//	auto hwnd = data->hwnd;
+
+	//	char szBuff[64];
+	//	sprintf(szBuff, "%p", hwnd);
+
+	//	FILE* file;
+	//	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
+	//	fprintf(file, "Entered callWndProc: %p\n", szBuff);
+
+	//	if (GetAncestor(hwnd, GA_ROOT) == hwnd)
+	//	{
+	//		if (SetWindowSubclass(hwnd, &hookWndProc, 1, 0))
+	//		{
+	//			fprintf(file, "- subclassed\n");
+	//			m_hwnd = hwnd;
+	//		}
+	//		else
+	//		{
+	//			fprintf(file, "! error subclassing\n");
+	//		}
+	//	}
+	//	else
+	//	{
+	//		fprintf(file, "! wasn't parent\n");
+	//	}
+
+	//	fclose(file);
+	//}
+
+	//end:
+	//return(CallNextHookEx(NULL, code, wParam, lParam));
 }
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK callWndProcRet(int code, WPARAM wParam, LPARAM lParam)

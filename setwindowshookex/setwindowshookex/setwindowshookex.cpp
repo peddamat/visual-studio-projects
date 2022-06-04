@@ -26,7 +26,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	if (dll == NULL) { return printError("The DLL could not be found.\n"); }
 
 	DWORD procID;
-	HWND targetWnd = reinterpret_cast<HWND>(0x00070DAA);
+	HWND targetWnd = reinterpret_cast<HWND>(0x0070FA2);
 	//HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
 	//HWND targetWnd = FindWindow(L"Notepad", NULL);
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
@@ -48,31 +48,43 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 	// Hook #2
-	HOOKPROC procAddr2 = (HOOKPROC)GetProcAddress(dll, "callWndProc");
-	if (procAddr2 == NULL) { return printError("callWndProc not found.\n"); }
+	//HOOKPROC procAddr2 = (HOOKPROC)GetProcAddress(dll, "callWndProc");
+	//if (procAddr2 == NULL) { return printError("callWndProc not found.\n"); }
 
-	HHOOK handle2 = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
-	if (handle2 == NULL) { return printError("WH_WNDPROC could not be hooked.\n"); }
+	//HHOOK handle2 = SetWindowsHookEx(WH_CALLWNDPROC, procAddr2, dll, threadID);
+	//if (handle2 == NULL) { return printError("WH_WNDPROC could not be hooked.\n"); }
 
 
 	// Hook #3
-	HOOKPROC procAddr3 = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
-	if (procAddr3 == NULL) { return printError("callWndProcRet not found.\n"); }
+	//HOOKPROC procAddr3 = (HOOKPROC)GetProcAddress(dll, "callWndProcRet");
+	//if (procAddr3 == NULL) { return printError("callWndProcRet not found.\n"); }
 
-	HHOOK handle3 = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
-	if (handle3 == NULL) { return printError("WH_WNDPROCRET could not be hooked.\n"); }
+	//HHOOK handle3 = SetWindowsHookEx(WH_CALLWNDPROCRET, procAddr3, dll, threadID);
+	//if (handle3 == NULL) { return printError("WH_WNDPROCRET could not be hooked.\n"); }
+
+	// Hook #4
+	HOOKPROC procAddr4 = (HOOKPROC)GetProcAddress(dll, "getMsgProc");
+	if (procAddr4 == NULL) { return printError("getMsgProc not found.\n"); }
+
+	HHOOK handle4 = SetWindowsHookEx(WH_GETMESSAGE, procAddr4, dll, threadID);
+	if (handle4 == NULL) { return printError("WH_GETMESSAGE could not be hooked.\n"); }
 
 
-	DWORD_PTR result;
-	SendMessageTimeout(HWND_BROADCAST, WM_NULL, 0, 0, SMTO_ABORTIFHUNG, 10, &result);
+	if (!PostMessage(targetWnd, WM_USER+666, (WPARAM)targetWnd, 0xFF))
+	{
+		printf("FUCKED\n");
+	}
+
+
 		
 	//// Unhook the function.
 	printf("Program successfully hooked.\nPress enter to unhook the function and stop the program.\n");
 	getchar();
 
 	// TODO: Clean-up added window property
-	UnhookWindowsHookEx(handle2);
-	UnhookWindowsHookEx(handle3);
+	//PostMessage(targetWnd, WM_USER+667, (WPARAM)targetWnd, 0xFF);
+	UnhookWindowsHookEx(handle4);
+	//UnhookWindowsHookEx(handle3);
 	RemoveProp(targetWnd, PropertyZoneSizeID);
 	RemoveProp(targetWnd, PropertyZoneOriginID);
 
