@@ -87,95 +87,62 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 
 	switch (msg)
 	{
+
 	case WM_SYSCOMMAND:
-		if (wParam == SC_MAXIMIZE)
-			m_maximized = TRUE;
-		else if (wParam == SC_RESTORE)
-			m_maximized = FALSE;
-		break;
-
-	case WM_WINDOWPOSCHANGING:
-	{
-		if (!m_maximized) 
-			goto end;
-
-		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-		fprintf(file, "Entered hookWndProc\n");
-
-		POINT zoneSize = { 0,0 };
-		POINT zoneOrigin = { 0,0 };
-
-		if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
+		if (SC_MAXIMIZE == (wParam & ~HTCAPTION))
 		{
-			fprintf(file, "- found maxsize prop\n");
-			// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
-			auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
+			FILE* file;
+			fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
+			fprintf(file, "Entered WM_SYSCOMMAND\n");
 
-			windowpos->cx = zoneSize.x;
-			windowpos->cy = zoneSize.y;
+			POINT zoneSize = { 0,0 };
+			POINT zoneOrigin = { 0,0 };
 
-			windowpos->x = zoneOrigin.x;
-			windowpos->y = zoneOrigin.y;
-
-			//windowpos->flags = SWP_NOMOVE;
-		}
-		else
-		{
-			fprintf(file, "!! couldn't find maxsize prop!\n");
-		}
-		fclose(file);
-
-		return 0;
-	}
-	case WM_GETMINMAXINFO:
-	{
-		if (!m_maximized) 
-			goto end;
-
-		FILE* file;
-		fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-		fprintf(file, "Entered hookWndProc\n");
-
-		POINT zoneSize = { 0,0 };
-		POINT zoneOrigin = { 0,0 };
-
-		if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
-		{
-			fprintf(file, "found maxsize prop\n");
-			// Reference: https://www.betaarchive.com/wiki/index.php/Microsoft_KB_Archive/67166
-			auto minmax = reinterpret_cast<MINMAXINFO*>(lParam);
-
-			minmax->ptMaxSize.x = zoneSize.x;
-			minmax->ptMaxSize.y = zoneSize.y;
-
-			minmax->ptMaxPosition.x = zoneOrigin.x;
-			minmax->ptMaxPosition.y = zoneOrigin.y;
-
-			minmax->ptMinTrackSize.x = zoneSize.x;
-			minmax->ptMinTrackSize.y = zoneSize.y;
-
-			minmax->ptMaxTrackSize.x = zoneSize.x;
-			minmax->ptMaxTrackSize.y = zoneSize.y;
-		}
-		else
-		{
-			fprintf(file, "couldn't find maxsize prop!\n");
-		}
-		fclose(file);
-		return 0;
-	}
-	break;
-
-	case WM_WINDOWPOSCHANGED:
-		if (m_maximized)
-		{
-			auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
-			windowpos->flags = SWP_NOMOVE;
+			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
+			{
+				fprintf(file, "- found maxsize prop\n");
+				SetWindowPos(hwnd, NULL, zoneOrigin.x, zoneOrigin.y, zoneSize.x, zoneSize.y, SWP_SHOWWINDOW);
+				SetWindowLongPtr(hwnd, GWL_STYLE, WS_MAXIMIZE | GetWindowLong(hwnd, GWL_STYLE));
+				fclose(file);
+				return 0;
+			}
+			else
+			{
+				fprintf(file, "!! couldn't find maxsize prop!\n");
+				fclose(file);
+			}
 
 			return 0;
 		}
 		break;
+	case WM_WINDOWPOSCHANGING:
+	{
+
+
+		auto style = GetWindowLong(hwnd, GWL_STYLE);
+		if (style & WS_MAXIMIZE)
+		{
+			auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
+			windowpos->flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
+
+		//	//FILE* file;
+		//	//fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
+
+		//	//fprintf(file, "Entered WM_WINDOWPOSCHANGING: blocking\n");
+		//	//fclose(file);
+			return 0;
+		}
+		//else
+		//{
+		//	//FILE* file;
+		//	//fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
+
+		//	//fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
+		//	//fclose(file);
+		//	return DefSubclassProc(hwnd, msg, wParam, lParam);
+		//}
+	}
+	break;
 	}
 
 	end:
