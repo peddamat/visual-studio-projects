@@ -29,9 +29,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	HOOKPROC procAddr4 = (HOOKPROC)GetProcAddress(dll, "getMsgProc");
 	if (procAddr4 == NULL) { return printError("getMsgProc not found.\n"); }
 
-	HWND targetWnd = reinterpret_cast<HWND>(0x1F70F8A);
+	//HWND targetWnd = reinterpret_cast<HWND>(0x32168E);
 	//HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
 	//HWND targetWnd = FindWindow(L"Notepad", NULL);
+	HWND targetWnd = FindWindow(NULL, L"New Tab - Google Chrome");
 	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
 
 	DWORD procID;

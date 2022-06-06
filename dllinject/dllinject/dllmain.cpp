@@ -86,49 +86,11 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 	if (!GetPropW(hwnd, PropertyZoneSizeID))
 		goto return_default;
 
-	//FILE* file;
-	//fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
+	FILE* file;
+	fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
 
 	switch (msg)
 	{
-
-	/**
-	  *	WM_SYSCOMMAND events are generated when a window is maximized.
-	  *	We override the default behavior and manually place the window
-	  *	to avoid...
-	  */
-	case WM_SYSCOMMAND:
-
-		/* Clicking the 'maximize' button generates a SC_MAXIMIZE message. 
-		 * Double-clicking the title bar generates a SC_MAXIMIZE | HTCAPTION message.
-		 */
-		if (SC_MAXIMIZE == (wParam & ~HTCAPTION))
-		{
-			//fprintf(file, "Entered WM_SYSCOMMAND\n");
-
-			POINT zoneSize = { 0,0 };
-			POINT zoneOrigin = { 0,0 };
-
-			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
-			{
-				// Resize the window to fit within the zone
-				SetWindowPos(hwnd, NULL, zoneOrigin.x, zoneOrigin.y, zoneSize.x, zoneSize.y, SWP_SHOWWINDOW);
-				// Set the WS_MAXIMIZE window style, which changes the titlebar 'maximize' icon to a 'restore' icon,
-				// Setting this bit also prevents moving or resizing the window
-				SetWindowLongPtr(hwnd, GWL_STYLE, WS_MAXIMIZE | GetWindowLong(hwnd, GWL_STYLE));
-				// Redraw the window so the updated icon is displayed
-				SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-
-				//fprintf(file, "- window resized\n");
-				goto return_override;
-			}
-			else
-			{
-				//fprintf(file, "!! couldn't find maxsize prop!\n");
-				goto return_default;
-			}
-		}
-		break;
 
 	/**
 	  *	WM_WINDOWPOSCHANGING events are generated when a window is being sized
@@ -136,18 +98,18 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 	  * and manually define the window's size and position.
 	  */
 	case WM_WINDOWPOSCHANGING:
-		//fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
+		fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
 
 		if (WS_MAXIMIZE & GetWindowLong(hwnd, GWL_STYLE))
 		{
-			//fprintf(file, "- window is maximized\n");
+			fprintf(file, "- window is maximized\n");
 
 			POINT zoneSize = { 0,0 };
 			POINT zoneOrigin = { 0,0 };
 
 			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
 			{
-				//fprintf(file, "- found zone info\n");
+				fprintf(file, "- found zone info\n");
 				auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
 				//windowpos->flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
 
@@ -161,13 +123,13 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 			}
 			else
 			{
-				//fprintf(file, "!! couldn't find maxsize prop!\n");
+				fprintf(file, "!! couldn't find maxsize prop!\n");
 				goto return_default;
 			}
 		}
 		else
 		{
-			//fprintf(file, "- window isn't maximized\n");
+			fprintf(file, "- window isn't maximized\n");
 			goto return_default;
 		}
 		break;
@@ -177,13 +139,13 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 		break;
 	}
 
-	return_override:
-	//fclose(file);
-	return 0;
-
 	return_default:
-	//fclose(file);
+	fclose(file);
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
+
+	return_override:
+	fclose(file);
+	return 0;
 }
 
 
