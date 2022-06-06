@@ -1,6 +1,5 @@
 #include "stdafx.h"
 #include <Windows.h>
-#include <conio.h>
 #include <stdio.h>
 #include <winuser.h>
 #include <array>
@@ -10,6 +9,7 @@
 
 const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
+
 BOOL SaveZoneSizeAndOrigin(HWND window, POINT maxSize, POINT maxPosition) noexcept;
 
 int printError(char* msg)
@@ -21,36 +21,64 @@ int printError(char* msg)
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	// Load library in which we'll be hooking our functions.
-	HMODULE dll = LoadLibrary(L"dllinject.dll");
-	if (dll == NULL) { return printError("The DLL could not be found.\n"); }
+	/******************************************************************************
+	* Step 1: Set the WH_GETMESSAGE hook in the target window
+	******************************************************************************/
 
-	// Hook #4
-	HOOKPROC procAddr4 = (HOOKPROC)GetProcAddress(dll, "getMsgProc");
-	if (procAddr4 == NULL) { return printError("getMsgProc not found.\n"); }
+	// Load the DLL that we'll be injecting
+	auto dll = LoadLibrary(L"dllinject.dll");
+	if (dll == NULL) 
+	{ 
+		return printError("The DLL could not be found\n"); 
+	}
 
-	//HWND targetWnd = reinterpret_cast<HWND>(0x32168E);
-	//HWND targetWnd = FindWindow(L"Chrome_WidgetWin_1", NULL);
-	//HWND targetWnd = FindWindow(L"Notepad", NULL);
-	HWND targetWnd = FindWindow(NULL, L"New Tab - Google Chrome");
-	if (targetWnd == NULL) { return printError("Couldn't find app\n"); }
+	// Get the address of the hook function
+	auto hookAddress = (HOOKPROC)GetProcAddress(dll, "getMsgProc");
+	if (hookAddress == NULL)
+	{
+		return printError("getMsgProc not found.\n"); 
+	}
 
+	// Get the handle of the window we'll be hooking
+	auto targetWnd = FindWindow(NULL, L"New Tab - Google Chrome");
+	if (targetWnd == NULL) 
+	{ 
+		return printError("Couldn't target window\n"); 
+	}
+
+	// Now get it's process and thread ID
 	DWORD procID;
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
-	HHOOK handle4 = SetWindowsHookEx(WH_GETMESSAGE, procAddr4, dll, threadID);
-	if (handle4 == NULL) { return printError("WH_GETMESSAGE could not be hooked.\n"); }
+	// Set the hook
+	auto hookHandle = SetWindowsHookEx(WH_GETMESSAGE, hookAddress, dll, threadID);
+	if (hookHandle == NULL) 
+	{ 
+		return printError("WH_GETMESSAGE could not be hooked\n"); 
+	}
 
+
+	/******************************************************************************
+	* Step 2: Define a zone for the target window
+	******************************************************************************/
 
 	// Set the max dimensions of window
 	POINT maxSize{ 2200, 1200 };
 	POINT maxPosition{ 500, 100 };
 
-	if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) { return printError("Couldn't set max dimensions\n"); }
+	if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) 
+	{ 
+		return printError("Couldn't add zone property to window\n"); 
+	}
+
+
+	/******************************************************************************
+	* Step 3: Send the ADD_SUBCLASS message to the target window
+	******************************************************************************/
 
 	if (!PostMessage(targetWnd, WM_USER+666, (WPARAM)targetWnd, 0xFF))
 	{
-		printf("FUCKED\n");
+		printf("Couldn't trigger subclassing function\n");
 	}
 
 	// Unhook the function.
@@ -59,8 +87,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 	// Clean-up
-	UnhookWindowsHookEx(handle4);
-	//UnhookWindowsHookEx(handle3);
+	UnhookWindowsHookEx(hookHandle);
 	RemoveProp(targetWnd, PropertyZoneSizeID);
 	RemoveProp(targetWnd, PropertyZoneOriginID);
 

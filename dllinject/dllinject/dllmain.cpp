@@ -6,88 +6,43 @@
 
 #pragma comment(lib, "comctl32.lib")
 
-BOOL m_hooked = FALSE;
-extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
-
 HWND m_hwnd = NULL;
-BOOL m_maximized = FALSE;
 const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
+
+LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
+bool AddHook(HWND hwnd);
+bool RemoveHook(HWND hwnd);
+void LOG(const char* message);
 BOOL GetZoneSizeAndOrigin(HWND window, POINT& zoneSize, POINT& zoneOrigin) noexcept;
 
 
+/******************************************************************************
+* DLL Entrypoint
+******************************************************************************/
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
-	/* open file */
-	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-
 	switch (Reason) {
-	case DLL_PROCESS_ATTACH:
-		fprintf(file, "DLL attach function called.\n");
-	break;
 	case DLL_PROCESS_DETACH:
-		fprintf(file, "DLL detach function called.\n");
-		if (RemoveWindowSubclass(m_hwnd, &hookWndProc, 1)) {
-			fprintf(file, "- wndProc unsubclassed!\n");
+		// If the hook is still in place, unhook it
+		if (m_hwnd != NULL)
+		{
+			RemoveHook(m_hwnd);
 		}
-		else {
-			fprintf(file, "!! wndProc NOT ubsubclassed!\n");
-		}
-
-		//CreateThread(0, NULL, (LPTHREAD_START_ROUTINE)&deinit, NULL, NULL, NULL);
-		break;
-	case DLL_THREAD_ATTACH:
-		fprintf(file, "DLL thread attach function called.\n");
-		break;
-	case DLL_THREAD_DETACH:
-		fprintf(file, "DLL thread detach function called.\n");
 		break;
 	}
-
-	/* close file */
-	fclose(file);
 
 	return TRUE;
 }
 
-extern "C" __declspec(dllexport) LRESULT CALLBACK getMsgProc(int code, WPARAM wParam, LPARAM lParam) {
-	if (code < 0) // Do not process
-		goto end;
 
-	auto msg = reinterpret_cast<MSG*>(lParam);
-
-	if (msg->message != WM_USER+666)
-		goto end;
-
-	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
-	fprintf(file, "Entered getMsgProc\n");
-
-	HWND hwnd = reinterpret_cast<HWND>(msg->wParam);
-	if (SetWindowSubclass(hwnd, &hookWndProc, 1, 0)) {
-		fprintf(file, "- wndProc subclassed\n");
-	}
-	else {
-		fprintf(file, "!! wndProc NOT subclassed\n");
-	}
-
-	// Save handle to subclassed window
-	m_hwnd = hwnd;
-
-	fclose(file);
-
-	end:
-	return(CallNextHookEx(NULL, code, wParam, lParam));
-}
-
-extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+/******************************************************************************
+* FancyZones Window Process Subclass
+******************************************************************************/
+LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
 	// Only process windows that are in a zone
 	if (!GetPropW(hwnd, PropertyZoneSizeID))
-		goto return_default;
-
-	FILE* file;
-	fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
+		goto end;
 
 	switch (msg)
 	{
@@ -98,20 +53,16 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 	  * and manually define the window's size and position.
 	  */
 	case WM_WINDOWPOSCHANGING:
-		fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
+		LOG("Entered WM_WINDOWPOSCHANGING: \n");
 
 		if (WS_MAXIMIZE & GetWindowLong(hwnd, GWL_STYLE))
 		{
-			fprintf(file, "- window is maximized\n");
-
 			POINT zoneSize = { 0,0 };
 			POINT zoneOrigin = { 0,0 };
 
 			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
 			{
-				fprintf(file, "- found zone info\n");
 				auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
-				//windowpos->flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
 
 				windowpos->x = zoneOrigin.x;
 				windowpos->y = zoneOrigin.y;
@@ -119,36 +70,80 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT ms
 				windowpos->cx = zoneSize.x;
 				windowpos->cy = zoneSize.y;
 
-				goto return_override;
+				LOG(" window moved\n");
+				return 0;
 			}
 			else
 			{
-				fprintf(file, "!! couldn't find maxsize prop!\n");
-				goto return_default;
+				LOG(" error getting window property!\n");
 			}
 		}
-		else
-		{
-			fprintf(file, "- window isn't maximized\n");
-			goto return_default;
-		}
 		break;
 
-	default:
-		goto return_default;
-		break;
 	}
 
-	return_default:
-	fclose(file);
+	end:
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
-
-	return_override:
-	fclose(file);
-	return 0;
 }
 
 
+/******************************************************************************
+* Window Process Hook Functions
+******************************************************************************/
+bool AddHook(HWND hwnd)
+{
+	LOG("Hooking wndProc: ");
+
+	if (!SetWindowSubclass(hwnd, &hookWndProc, 1, 0)) {
+		LOG(" Error!\n");
+		return FALSE;
+	}
+
+	// Save handle to subclassed window
+	m_hwnd = hwnd;
+
+	LOG(" Success!\n");
+	return TRUE;
+}
+
+bool RemoveHook(HWND hwnd)
+{
+	LOG("Unhooking wndProc: ");
+
+	if (!RemoveWindowSubclass(hwnd, &hookWndProc, 1)) {
+		LOG(" Error!\n");
+		return FALSE;
+	}
+
+	LOG(" Success!\n");
+	return TRUE;
+}
+
+extern "C" __declspec(dllexport) 
+LRESULT CALLBACK getMsgProc(int code, WPARAM wParam, LPARAM lParam) {
+	if (code < 0) // Do not process
+		goto end;
+
+	auto msg = reinterpret_cast<MSG*>(lParam);
+	if (msg->message == WM_USER + 666)
+	{
+		auto hwnd = reinterpret_cast<HWND>(msg->wParam);
+		AddHook(hwnd);
+	}
+	else if (msg->message == WM_USER+667)
+	{
+		auto hwnd = reinterpret_cast<HWND>(msg->wParam);
+		RemoveHook(hwnd);
+	}
+
+	end:
+	return(CallNextHookEx(NULL, code, wParam, lParam));
+}
+
+
+/******************************************************************************
+* Utility functions
+******************************************************************************/
 BOOL GetZoneSizeAndOrigin(HWND window, POINT &zoneSize, POINT &zoneOrigin) noexcept
 {
 	// Retrieve the zone size
@@ -177,4 +172,15 @@ BOOL GetZoneSizeAndOrigin(HWND window, POINT &zoneSize, POINT &zoneOrigin) noexc
 	//DPIAware::Convert(MonitorFromWindow(window, MONITOR_DEFAULTTONULL), windowWidth, windowHeight);
 
 	return true;
+}
+
+
+void LOG(const char* message)
+{	
+	FILE* file;
+	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
+
+	fprintf(file, message);
+
+	fclose(file);
 }
