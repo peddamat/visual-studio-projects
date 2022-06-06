@@ -63,13 +63,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	******************************************************************************/
 
 	// Set the max dimensions of window
-	POINT maxSize{ 2200, 1200 };
-	POINT maxPosition{ 500, 100 };
+	//POINT maxSize{ 2200, 1200 };
+	//POINT maxPosition{ 500, 100 };
 
-	if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) 
-	{ 
-		return printError("Couldn't add zone property to window\n"); 
-	}
+	//if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) 
+	//{ 
+	//	return printError("Couldn't add zone property to window\n"); 
+	//}
 
 
 	/******************************************************************************
@@ -111,13 +111,13 @@ BOOL SaveZoneSizeAndOrigin(HWND window, POINT zoneSize, POINT zoneOrigin) noexce
 
 	HANDLE rawData;
 
-	memcpy(&rawData, windowSizeData.data(), sizeof rawData);
+	memcpy(&rawData, windowSizeData.data(), sizeof windowSizeData);
 	if (!SetPropW(window, PropertyZoneSizeID, rawData))
 	{
 		return false;
 	}
 
-	memcpy(&rawData, windowOriginData.data(), sizeof rawData);
+	memcpy(&rawData, windowOriginData.data(), sizeof windowOriginData);
 	if (!SetPropW(window, PropertyZoneOriginID, rawData))
 	{
 		return false;
