@@ -82,125 +82,107 @@ extern "C" __declspec(dllexport) LRESULT CALLBACK getMsgProc(int code, WPARAM wP
 
 extern "C" __declspec(dllexport) LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
+	// Only process windows that are in a zone
 	if (!GetPropW(hwnd, PropertyZoneSizeID))
-		goto end;
+		goto return_default;
+
+	//FILE* file;
+	//fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
 
 	switch (msg)
 	{
 
-		case WM_SYSCOMMAND:
-			if (SC_MAXIMIZE == (wParam & ~HTCAPTION))
-			{
-				FILE* file;
-				fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
-				fprintf(file, "Entered WM_SYSCOMMAND\n");
+	/**
+	  *	WM_SYSCOMMAND events are generated when a window is maximized.
+	  *	We override the default behavior and manually place the window
+	  *	to avoid...
+	  */
+	case WM_SYSCOMMAND:
 
-				POINT zoneSize = { 0,0 };
-				POINT zoneOrigin = { 0,0 };
-
-				if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
-				{
-					fprintf(file, "- found maxsize prop\n");
-					SetWindowPos(hwnd, NULL, zoneOrigin.x, zoneOrigin.y, zoneSize.x, zoneSize.y, SWP_SHOWWINDOW);
-					SetWindowLongPtr(hwnd, GWL_STYLE, WS_MAXIMIZE | GetWindowLong(hwnd, GWL_STYLE));
-					SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-					fclose(file);
-					return 0;
-				}
-				else
-				{
-					fprintf(file, "!! couldn't find maxsize prop!\n");
-					fclose(file);
-				}
-
-				return 0;
-			}
-			break;
-
-		//case WM_GETMINMAXINFO:
-		//{
-		//	FILE* file;
-		//	fopen_s(&file, "c:\\users\\me\\debug\\dllmain2.txt", "a+");
-		//	fprintf(file, "Entered WM_GETMINMAX\n");
-
-		//	POINT zoneSize = { 0,0 };
-		//	POINT zoneOrigin = { 0,0 };
-
-		//	if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
-		//	{
-		//		fprintf(file, "- found zone info\n");
-		//		auto minmax = reinterpret_cast<MINMAXINFO*>(lParam);
-		//		//minmax->ptMaxSize.x = zoneSize.x;
-		//		//minmax->ptMaxSize.y = zoneSize.y;
-
-		//		minmax->ptMinTrackSize.x = zoneSize.x;
-		//		minmax->ptMinTrackSize.y = zoneSize.y;
-
-		//		minmax->ptMaxTrackSize.x = zoneSize.x;
-		//		minmax->ptMaxTrackSize.y = zoneSize.y;
-
-		//		minmax->ptMaxPosition.x = zoneOrigin.x;
-		//		minmax->ptMaxPosition.y = zoneOrigin.y;
-
-		//		fclose(file);
-		//		return 0;
-		//	}
-		//	else
-		//	{
-		//		fprintf(file, "!! couldn't find maxsize prop!\n");
-		//		fclose(file);
-		//		return DefSubclassProc(hwnd, msg, wParam, lParam);
-		//	}
-
-		//}
-		//break;
-
-		case WM_WINDOWPOSCHANGING:
+		/* Clicking the 'maximize' button generates a SC_MAXIMIZE message. 
+		 * Double-clicking the title bar generates a SC_MAXIMIZE | HTCAPTION message.
+		 */
+		if (SC_MAXIMIZE == (wParam & ~HTCAPTION))
 		{
-			FILE* file;
-			fopen_s(&file, "c:\\users\\me\\debug\\dllmain3.txt", "a+");
-			fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
+			//fprintf(file, "Entered WM_SYSCOMMAND\n");
 
-			auto fuck = GetWindowLong(hwnd, GWL_STYLE);
-			if (fuck & WS_MAXIMIZE)
+			POINT zoneSize = { 0,0 };
+			POINT zoneOrigin = { 0,0 };
+
+			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
 			{
-				fprintf(file, "- window is maximized\n");
+				// Resize the window to fit within the zone
+				SetWindowPos(hwnd, NULL, zoneOrigin.x, zoneOrigin.y, zoneSize.x, zoneSize.y, SWP_SHOWWINDOW);
+				// Set the WS_MAXIMIZE window style, which changes the titlebar 'maximize' icon to a 'restore' icon,
+				// Setting this bit also prevents moving or resizing the window
+				SetWindowLongPtr(hwnd, GWL_STYLE, WS_MAXIMIZE | GetWindowLong(hwnd, GWL_STYLE));
+				// Redraw the window so the updated icon is displayed
+				SetWindowPos(hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
-				POINT zoneSize = { 0,0 };
-				POINT zoneOrigin = { 0,0 };
-
-				if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
-				{
-					fprintf(file, "- found zone info\n");
-					auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
-					//windowpos->flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
-
-					windowpos->x = zoneOrigin.x;
-					windowpos->y = zoneOrigin.y;
-
-					windowpos->cx = zoneSize.x;
-					windowpos->cy = zoneSize.y;
-
-					fclose(file);
-					return 0;
-				}
-				else
-				{
-					fprintf(file, "!! couldn't find maxsize prop!\n");
-					fclose(file);
-					return DefSubclassProc(hwnd, msg, wParam, lParam);
-				}
+				//fprintf(file, "- window resized\n");
+				goto return_override;
 			}
 			else
 			{
-				fprintf(file, "- window isn't maximized\n");
-				fclose(file);
+				//fprintf(file, "!! couldn't find maxsize prop!\n");
+				goto return_default;
 			}
 		}
 		break;
+
+	/**
+	  *	WM_WINDOWPOSCHANGING events are generated when a window is being sized
+	  * or moved.  If the window is maximized, we override the default behavior 
+	  * and manually define the window's size and position.
+	  */
+	case WM_WINDOWPOSCHANGING:
+		//fprintf(file, "Entered WM_WINDOWPOSCHANGING\n");
+
+		if (WS_MAXIMIZE & GetWindowLong(hwnd, GWL_STYLE))
+		{
+			//fprintf(file, "- window is maximized\n");
+
+			POINT zoneSize = { 0,0 };
+			POINT zoneOrigin = { 0,0 };
+
+			if (GetZoneSizeAndOrigin(hwnd, zoneSize, zoneOrigin))
+			{
+				//fprintf(file, "- found zone info\n");
+				auto windowpos = reinterpret_cast<WINDOWPOS*>(lParam);
+				//windowpos->flags = SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW;
+
+				windowpos->x = zoneOrigin.x;
+				windowpos->y = zoneOrigin.y;
+
+				windowpos->cx = zoneSize.x;
+				windowpos->cy = zoneSize.y;
+
+				goto return_override;
+			}
+			else
+			{
+				//fprintf(file, "!! couldn't find maxsize prop!\n");
+				goto return_default;
+			}
+		}
+		else
+		{
+			//fprintf(file, "- window isn't maximized\n");
+			goto return_default;
+		}
+		break;
+
+	default:
+		goto return_default;
+		break;
 	}
 
-	end:
+	return_override:
+	//fclose(file);
+	return 0;
+
+	return_default:
+	//fclose(file);
 	return DefSubclassProc(hwnd, msg, wParam, lParam);
 }
 
