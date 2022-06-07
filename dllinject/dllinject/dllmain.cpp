@@ -6,14 +6,16 @@
 
 #pragma comment(lib, "comctl32.lib")
 
-HWND m_hwnd = NULL;
+static DWORD dwTlsIndex;
+
 const wchar_t PropertyZoneSizeID[] = L"FancyZones_ZoneSize";
 const wchar_t PropertyZoneOriginID[] = L"FancyZones_ZoneOrigin";
 
 LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 bool AddHook(HWND hwnd);
-bool RemoveHook(HWND hwnd);
+bool RemoveHook();
 void LOG(const char* message);
+void LOG_MSG(const char* message, const char* args);
 BOOL GetZoneSizeAndOrigin(HWND window, POINT& zoneSize, POINT& zoneOrigin) noexcept;
 
 
@@ -21,13 +23,32 @@ BOOL GetZoneSizeAndOrigin(HWND window, POINT& zoneSize, POINT& zoneOrigin) noexc
 * DLL Entrypoint
 ******************************************************************************/
 INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
+	LPVOID lpvData;
+
 	switch (Reason) {
-	case DLL_PROCESS_DETACH:
-		// If the hook is still in place, unhook it
-		if (m_hwnd != NULL)
-		{
-			RemoveHook(m_hwnd);
+	case DLL_PROCESS_ATTACH:
+		LOG("Attaching DLL\n");
+		// Allocate a Thread Local Storage (TLS) index, so each
+		// hooked thread can independently store its HWND handle.
+		if ((dwTlsIndex = TlsAlloc()) == TLS_OUT_OF_INDEXES)
+		{ 
+			LOG("Error allocating TLS index!\n");
+			return FALSE;
 		}
+		break;
+	case DLL_PROCESS_DETACH:
+		LOG("Detaching DLL\n");
+
+		RemoveHook();
+		TlsFree(dwTlsIndex);
+		break;
+	case DLL_THREAD_ATTACH:
+		LOG_MSG("Attaching to thread: %i\n", (char *)GetCurrentThreadId());
+		break;
+	case DLL_THREAD_DETACH:
+		LOG_MSG("Detaching from thread: %i\n", (char *)GetCurrentThreadId());
+
+		RemoveHook();
 		break;
 	}
 
@@ -80,6 +101,17 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 		}
 		break;
 
+	case WM_DESTROY:
+		LOG("Entered WM_DESTROY\n");
+		RemoveHook();
+		break;
+
+	case WM_APP+667:
+		LOG("Received wndProc Unhook Message\n");
+		RemoveHook();
+		return 1;
+		break;
+
 	}
 
 	end:
@@ -92,7 +124,7 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 ******************************************************************************/
 bool AddHook(HWND hwnd)
 {
-	LOG("Hooking wndProc: ");
+	LOG_MSG("Hooking wndProc of %#010X\n", (char *)hwnd);
 
 	if (!SetWindowSubclass(hwnd, &hookWndProc, 1, 0)) {
 		LOG(" Error!\n");
@@ -100,20 +132,33 @@ bool AddHook(HWND hwnd)
 	}
 
 	// Save handle to subclassed window
-	m_hwnd = hwnd;
+	if (!TlsSetValue(dwTlsIndex, hwnd))
+	{
+		LOG(" Error saving hwnd for thread!\n");
+		return FALSE;
+	}
 
 	LOG(" Success!\n");
 	return TRUE;
 }
 
-bool RemoveHook(HWND hwnd)
+bool RemoveHook()
 {
-	LOG("Unhooking wndProc: ");
+	HWND hwnd = (HWND)TlsGetValue(dwTlsIndex);
+	LOG_MSG("Unhooking wndProc: %#010X\n", (char*)hwnd);
+
+	if (hwnd == NULL)
+	{
+		LOG(" Skipping, thread wasn't hooked!\n");
+		return TRUE;
+	}
 
 	if (!RemoveWindowSubclass(hwnd, &hookWndProc, 1)) {
-		LOG(" Error!\n");
+		LOG(" Error, couldn't remove subclass!\n");
 		return FALSE;
 	}
+
+	TlsSetValue(dwTlsIndex, 0);
 
 	LOG(" Success!\n");
 	return TRUE;
@@ -124,16 +169,23 @@ LRESULT CALLBACK getMsgProc(int code, WPARAM wParam, LPARAM lParam) {
 	if (code < 0) // Do not process
 		goto end;
 
+	// Only process the message after it's been removed from the message queue, 
+	// otherwise we may accidentally process it more than once.
+	if (wParam != PM_REMOVE)
+		goto end; 
+
 	auto msg = reinterpret_cast<MSG*>(lParam);
-	if (msg->message == WM_USER + 666)
+	if (msg->message == WM_APP + 666)
 	{
+		LOG("Received AddHook message\n");
 		auto hwnd = reinterpret_cast<HWND>(msg->wParam);
 		AddHook(hwnd);
 	}
-	else if (msg->message == WM_USER+667)
+	else if (msg->message == WM_APP+667)
 	{
+		LOG("Received RemoveHook message\n");
 		auto hwnd = reinterpret_cast<HWND>(msg->wParam);
-		RemoveHook(hwnd);
+		RemoveHook();
 	}
 
 	end:
@@ -184,3 +236,11 @@ void LOG(const char* message)
 
 	fclose(file);
 }
+
+void LOG_MSG(const char* message, const char* args)
+{	
+	char buf[100];
+	sprintf(buf, message, args);
+	LOG(buf);
+}
+

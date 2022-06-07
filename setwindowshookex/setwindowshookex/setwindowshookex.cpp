@@ -50,6 +50,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	DWORD procID;
 	auto threadID = GetWindowThreadProcessId(targetWnd, &procID);
 
+	printf("Preparing to hook: %#010X, procID: %i, threadID: %i\n", targetWnd, procID, threadID);
+
 	// Set the hook
 	auto hookHandle = SetWindowsHookEx(WH_GETMESSAGE, hookAddress, dll, threadID);
 	if (hookHandle == NULL) 
@@ -57,33 +59,43 @@ int _tmain(int argc, _TCHAR* argv[])
 		return printError("WH_GETMESSAGE could not be hooked\n"); 
 	}
 
+	FreeLibrary(dll);
 
 	/******************************************************************************
 	* Step 2: Define a zone for the target window
 	******************************************************************************/
 
 	// Set the max dimensions of window
-	//POINT maxSize{ 2200, 1200 };
-	//POINT maxPosition{ 500, 100 };
+	POINT maxSize{ 2200, 1200 };
+	POINT maxPosition{ 500, 100 };
 
-	//if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) 
-	//{ 
-	//	return printError("Couldn't add zone property to window\n"); 
-	//}
+	if (!SaveZoneSizeAndOrigin(targetWnd, maxSize, maxPosition)) 
+	{ 
+		return printError("Couldn't add zone property to window\n"); 
+	}
 
 
 	/******************************************************************************
 	* Step 3: Send the ADD_SUBCLASS message to the target window
 	******************************************************************************/
 
-	if (!PostMessage(targetWnd, WM_USER+666, (WPARAM)targetWnd, 0xFF))
+	if (!PostMessage(targetWnd, WM_APP+666, (WPARAM)targetWnd, 0xFF))
 	{
 		printf("Couldn't trigger subclassing function\n");
 	}
 
+
 	// Unhook the function.
 	printf("Program successfully hooked.\nPress enter to unhook the function and stop the program.\n");
 	getchar();
+	getchar();
+
+	if (!SendMessage(targetWnd, WM_APP+667, (WPARAM)targetWnd, 0xFF))
+	{
+		printf("Couldn't trigger subclassing function\n");
+	}
+	printf("Sent unhook\n");
+
 
 
 	// Clean-up
