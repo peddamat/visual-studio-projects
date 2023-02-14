@@ -19,6 +19,8 @@ int printError(char* msg)
 	return -1;
 }
 
+HHOOK fart = NULL;
+
 int _tmain(int argc, _TCHAR* argv[])
 {
 	/******************************************************************************
@@ -59,7 +61,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		return printError("WH_GETMESSAGE could not be hooked\n"); 
 	}
 
-	FreeLibrary(dll);
+	fart = hookHandle;
+	//FreeLibrary(dll);
 
 	/******************************************************************************
 	* Step 2: Define a zone for the target window
@@ -99,7 +102,7 @@ int _tmain(int argc, _TCHAR* argv[])
 
 
 	// Clean-up
-	UnhookWindowsHookEx(hookHandle);
+	//UnhookWindowsHookEx(hookHandle);
 	RemoveProp(targetWnd, PropertyZoneSizeID);
 	RemoveProp(targetWnd, PropertyZoneOriginID);
 

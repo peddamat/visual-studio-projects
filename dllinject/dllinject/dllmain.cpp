@@ -27,7 +27,7 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 
 	switch (Reason) {
 	case DLL_PROCESS_ATTACH:
-		LOG("Attaching DLL\n");
+		LOG_MSG("Attaching DLL to: %i\n", (char*)GetCurrentProcessId());
 		// Allocate a Thread Local Storage (TLS) index, so each
 		// hooked thread can independently store its HWND handle.
 		if ((dwTlsIndex = TlsAlloc()) == TLS_OUT_OF_INDEXES)
@@ -37,7 +37,7 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 		}
 		break;
 	case DLL_PROCESS_DETACH:
-		LOG("Detaching DLL\n");
+		LOG_MSG("Detaching DLL from: %i\n", (char*)GetCurrentProcessId());
 
 		RemoveHook();
 		TlsFree(dwTlsIndex);
@@ -48,7 +48,7 @@ INT APIENTRY DllMain(HMODULE hDLL, DWORD Reason, LPVOID Reserved) {
 	case DLL_THREAD_DETACH:
 		LOG_MSG("Detaching from thread: %i\n", (char *)GetCurrentThreadId());
 
-		RemoveHook();
+		//RemoveHook();
 		break;
 	}
 
@@ -75,6 +75,31 @@ LRESULT CALLBACK hookWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, 
 	  */
 	case WM_WINDOWPOSCHANGING:
 		LOG("Entered WM_WINDOWPOSCHANGING: \n");
+
+		RECT c;
+		GetClientRect(hwnd, &c);
+
+		MONITORINFO mi;
+
+		mi.cbSize = sizeof(mi);
+
+		if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &mi))
+		{
+			LOG("Monitor\n");
+			LOG_MSG("width: %i\n", (char*)(mi.rcWork.right - mi.rcWork.left));
+			LOG_MSG("height: %i\n", (char*)(mi.rcWork.bottom - mi.rcWork.top));
+
+			LOG("Window\n");
+			LOG_MSG("width: %i\n", (char *)(c.right - c.left));
+			LOG_MSG("height: %i\n", (char *)(c.bottom - c.top));
+
+			if (((mi.rcWork.right - mi.rcWork.left) == (c.right - c.left) &&
+				((mi.rcWork.bottom - mi.rcWork.top) == (c.bottom - c.top))))
+			{
+				Beep(1000, 1000);
+				break;
+			}
+		}
 
 		if (WS_MAXIMIZE & GetWindowLong(hwnd, GWL_STYLE))
 		{
@@ -229,6 +254,7 @@ BOOL GetZoneSizeAndOrigin(HWND window, POINT &zoneSize, POINT &zoneOrigin) noexc
 
 void LOG(const char* message)
 {	
+	return;
 	FILE* file;
 	fopen_s(&file, "c:\\users\\me\\debug\\dllmain.txt", "a+");
 
@@ -239,6 +265,7 @@ void LOG(const char* message)
 
 void LOG_MSG(const char* message, const char* args)
 {	
+	return;
 	char buf[100];
 	sprintf(buf, message, args);
 	LOG(buf);
